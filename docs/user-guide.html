@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>User Guide · mean-speed-raster</title>
+  <title>User Guide · Mean Speed Raster</title>
   <link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="bar">
-      <a class="brand" href="index.html">mean-speed-raster</a>
+      <a class="brand" href="index.html">Mean Speed Raster</a>
       <nav>
         <a href="index.html">Overview</a>
         <a href="user-guide.html" class="active">User Guide</a>
@@ -21,48 +21,103 @@
 
   <main>
     <h1>User Guide</h1>
-    <p class="lede">How to load mean-speed-raster, connect its data sources and fill in its settings.</p>
+    <p class="lede">How to load Mean Speed Raster, fill in its run form, and read the map it produces.</p>
 
     <h2>1. Load the workflow</h2>
-    <p>In the workflow runner, add a new template using this repository's URL, then select <strong>mean-speed-raster</strong> from the templates list.</p>
+    <p>In the workflow runner, add a new template using this repository's URL, then select <strong>Mean Speed Raster</strong> from the templates list.</p>
 
     <h2>2. Data sources</h2>
-    <ul><li>Access to a <strong>EarthRanger</strong> data source, set up as a connection</li></ul>
+    <ul><li>Access to an <strong>EarthRanger</strong> data source, set up as a connection.</li></ul>
 
-    <h2>3. Settings</h2>
-    <p>The run form asks for these. Fields with a default can be left as they are.</p>
-    <h3>Connect to Earthranger</h3>
-    <table>
-      <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
-      <tbody><tr><td>Data source <em>(required)</em></td><td>Select one of your configured data sources.</td><td>—</td></tr></tbody>
-    </table>
+    <h2>3. Fill in the run form</h2>
+    <p>The sections appear in this order. Sections marked <em>advanced</em> are hidden under the form's advanced options; their defaults work for most data.</p>
+
     <h3>Set Workflow Details</h3>
     <table>
       <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
-      <tbody><tr><td>Workflow Name <em>(required)</em></td><td></td><td>—</td></tr><tr><td>Workflow Description</td><td></td><td><code></code></td></tr></tbody>
+      <tbody>
+        <tr><td>Workflow Name <em>(required)</em></td><td>Title shown on the dashboard.</td><td>None</td></tr>
+        <tr><td>Workflow Description</td><td>Shown under the title.</td><td><em>(empty)</em></td></tr>
+      </tbody>
     </table>
+
     <h3>Set Time Range</h3>
     <table>
       <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
-      <tbody><tr><td>Since <em>(required)</em></td><td>The start time</td><td>—</td></tr><tr><td>Until <em>(required)</em></td><td>The end time</td><td>—</td></tr><tr><td>Timezone</td><td></td><td>—</td></tr></tbody>
+      <tbody>
+        <tr><td>Since <em>(required)</em></td><td>The start time.</td><td>None</td></tr>
+        <tr><td>Until <em>(required)</em></td><td>The end time.</td><td>None</td></tr>
+        <tr><td>Timezone</td><td>Time zone for the dates above and the dashboard's time range.</td><td>None</td></tr>
+      </tbody>
     </table>
+
+    <h3>Connect to Earthranger</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
+      <tbody><tr><td>Data Source <em>(required)</em></td><td>One of your configured EarthRanger connections.</td><td>None</td></tr></tbody>
+    </table>
+
+    <h3>Set Groupers</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
+      <tbody><tr><td>Group by</td><td>Two choices only:
+        <ul>
+          <li><strong>Leave it empty</strong> → one <em>All</em> view, with every subject's tracks in one grid.</li>
+          <li><strong>Add Category → Subject Name</strong> → one view per subject, with a selector on the dashboard.</li>
+        </ul></td><td><em>(empty = All)</em></td></tr></tbody>
+    </table>
+
     <h3>Subject Group</h3>
     <table>
       <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
-      <tbody><tr><td>Subject Group Name <em>(required)</em></td><td>⚠️ The use of a group with mixed subtypes could lead to unexpected results</td><td>—</td></tr></tbody>
-    </table>
-    <h3>Build Ecograph</h3>
-    <table>
-      <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
-      <tbody><tr><td>Cutoff</td><td>Cutoff distance for kernel.</td><td>—</td></tr><tr><td>Step Length</td><td>Mean step length, used as the resolution if `resolution` is None.</td><td><code>2000</code></td></tr></tbody>
+      <tbody><tr><td>Subject Group Name <em>(required)</em></td><td>Picked from the chosen data source's subject groups. ⚠️ A group with mixed subtypes could give unexpected results.</td><td>None</td></tr></tbody>
     </table>
 
-    <h2>4. Run it and find the results</h2>
-    <p>The workflow writes its files to the results folder the runner gives it (<code>ECOSCOPE_WORKFLOWS_RESULTS</code>), and shows its dashboard when it finishes.</p>
+    <h3>Set Base Maps <em>(advanced)</em></h3>
+    <table>
+      <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
+      <tbody><tr><td>Base maps</td><td>Tile layers under the raster; the first is the bottom layer.</td><td>ArcGIS World Topo (100%) + World Imagery (50%)</td></tr></tbody>
+    </table>
+
+    <h3>Trajectory Segment Filter <em>(advanced)</em></h3>
+    <p>A segment is the straight line between two consecutive GPS fixes. Segments outside these limits are removed before the grid is built.</p>
+    <table>
+      <thead><tr><th>Field</th><th>Default</th></tr></thead>
+      <tbody>
+        <tr><td>Minimum Segment Length (Meters)</td><td><code>0.001</code></td></tr>
+        <tr><td>Maximum Segment Length (Meters)</td><td><code>100000</code></td></tr>
+        <tr><td>Minimum Segment Duration (Seconds)</td><td><code>1</code></td></tr>
+        <tr><td>Maximum Segment Duration (Seconds)</td><td><code>172800</code> (48 h)</td></tr>
+        <tr><td>Minimum Segment Speed (Kilometers per Hour)</td><td><code>0.01</code></td></tr>
+        <tr><td>Maximum Segment Speed (Kilometers per Hour)</td><td><code>500</code>. Lower it (e.g. to 9 for elephants) to remove GPS spikes that would show as red cells.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Build Ecograph <em>(advanced)</em></h3>
+    <table>
+      <thead><tr><th>Field</th><th>Description</th><th>Default</th></tr></thead>
+      <tbody><tr><td>Step Length (m)</td><td>The size of each grid cell, in meters. Pick one of two options:
+        <ul>
+          <li><strong>Fixed value (m)</strong>: you set the cell size. Must be between 500 and 100000.</li>
+          <li><strong>Auto (use average step distance)</strong>: the cell size becomes the average distance between consecutive GPS fixes in the view.</li>
+        </ul>
+        Smaller cells show more detail but take longer and leave more empty gaps between cells; larger cells give a smoother, coarser picture.</td><td>Fixed value, <code>2000</code></td></tr></tbody>
+    </table>
+
+    <h2>4. Read the map</h2>
+    <ul>
+      <li>Each cell shows the <strong>mean speed (km/h)</strong> of the track segments that start in it. Cells with no segments are left empty.</li>
+      <li>The legend lists five speed ranges from slowest (dark green) to fastest (red).</li>
+      <li>The ranges are <strong>equal-interval</strong> across each view's own speeds, so they differ between subjects. Compare colours within one view, and check the legend before comparing views.</li>
+      <li>Hover a cell to see its class.</li>
+    </ul>
+
+    <h2>5. Find the results</h2>
+    <p>The dashboard opens when the run finishes. Each view's grid is attached to that view as a GeoParquet download. All files (the per-view grids and map HTMLs, plus the group's cleaned relocations and trajectories) are written to the results folder the runner gives the workflow (<code>ECOSCOPE_WORKFLOWS_RESULTS</code>).</p>
   </main>
 
   <footer class="site-footer">
-    <p>mean-speed-raster &middot; Wildlife Dynamics</p>
+    <p>Mean Speed Raster &middot; Wildlife Dynamics</p>
   </footer>
 </body>
 </html>

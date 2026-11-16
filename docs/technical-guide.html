@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Technical Guide · mean-speed-raster</title>
+  <title>Technical Guide · Mean Speed Raster</title>
   <link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="bar">
-      <a class="brand" href="index.html">mean-speed-raster</a>
+      <a class="brand" href="index.html">Mean Speed Raster</a>
       <nav>
         <a href="index.html">Overview</a>
         <a href="user-guide.html">User Guide</a>
@@ -21,25 +21,104 @@
 
   <main>
     <h1>Technical Guide</h1>
-    <p class="lede">The steps mean-speed-raster runs, the packages they come from, and how to recompile and test it.</p>
+    <p class="lede">What each step of <code>spec.yaml</code> does and with which settings, how the raster is built, how views and files reach the dashboard, and how to recompile and test.</p>
+
+    <h2>Pipeline</h2>
+    <pre><code>EarthRanger observations
+  → relocs (bad-coordinate filter) → trajectory (segment filter) → temporal index → map_columns
+  → split_groups ── per view ──→ ecograph grid → sort → classify → colour → GeoJSON layer ─┐
+                                      │                                  view state ──────┤
+                                      └→ persist GeoParquet → files view      draw map → persist HTML → map widget
+                                                                     ↓                                   ↓
+                                                         gather_dashboard  ←  merge_widget_views  ←──────┘</code></pre>
+    <p>Steps after <code>split_groups</code> run once per view: the <em>All</em> view, or one view per subject. The task defaults skip a step when its input is an empty table or a step it depends on was skipped (<code>any_is_empty_df</code>, <code>any_dependency_skipped</code>). The map widget is the exception, set to <code>never</code> skip, so an empty view still gets a widget.</p>
 
     <h2>Steps</h2>
-    <p>In the order they run. Each step is a task from one of the packages below.</p>
+    <p>In spec order. <strong>Fixed</strong> settings are set in <code>spec.yaml</code>; anything not listed there is on the run form.</p>
     <table>
-      <thead><tr><th>#</th><th>Step</th><th>Task</th><th>Group</th><th>What it does</th></tr></thead>
-      <tbody><tr><td>1</td><td><strong>Connect to Earthranger</strong></td><td><code>set_er_connection</code></td><td></td><td></td></tr><tr><td>2</td><td><strong>Set Base Maps</strong></td><td><code>set_base_maps</code></td><td></td><td></td></tr><tr><td>3</td><td><strong>Set Workflow Details</strong></td><td><code>set_workflow_details</code></td><td></td><td>Add information that will help to differentiate this workflow from another.</td></tr><tr><td>4</td><td><strong>Set Time Range</strong></td><td><code>set_time_range</code></td><td></td><td>Choose the period of time to analyze.</td></tr><tr><td>5</td><td><strong>Set Groupers</strong></td><td><code>set_groupers</code></td><td></td><td></td></tr><tr><td>6</td><td><strong>Subject Group</strong></td><td><code>get_subjectgroup_observations</code></td><td></td><td>Get observations for a subject group from EarthRanger.</td></tr><tr><td>7</td><td><strong>Process Relocs</strong></td><td><code>process_relocations</code></td><td></td><td></td></tr><tr><td>8</td><td><strong>Trajectory Segment Filter</strong></td><td><code>relocations_to_trajectory</code></td><td></td><td></td></tr><tr><td>9</td><td><strong>Add Temporal Index</strong></td><td><code>add_temporal_index</code></td><td></td><td></td></tr><tr><td>10</td><td><strong>Map Columns</strong></td><td><code>map_columns</code></td><td></td><td>Maps and transforms the columns of a DataFrame based on the provided parameters. The order of the operations is as follows: drop columns, retain/reorder columns, and rename columns.</td></tr><tr><td>11</td><td><strong>Split Groups</strong></td><td><code>split_groups</code></td><td></td><td></td></tr><tr><td>12</td><td><strong>Build Ecograph</strong></td><td><code>generate_ecograph_gdf</code></td><td></td><td>Build an Ecograph from trajectory data and return one movement covariate or network metric as a GeoDataFrame of raster-cell polygons.</td></tr><tr><td>13</td><td><strong>Apply Classification</strong></td><td><code>apply_classification</code></td><td></td><td>Classifies a dataframe column using specified classification scheme.</td></tr><tr><td>14</td><td><strong>Apply Color Map</strong></td><td><code>apply_color_map</code></td><td></td><td>Adds a color column to the dataframe based on the categorical values in the specified column.</td></tr><tr><td>15</td><td><strong>Create Geojson Layer</strong></td><td><code>create_geojson_layer</code></td><td></td><td>Creates a GeoJSON layer definition based on the provided configuration.</td></tr><tr><td>16</td><td><strong>Compute View State From Gdf</strong></td><td><code>compute_view_state_from_gdf</code></td><td></td><td></td></tr><tr><td>17</td><td><strong>Persist Ecograph</strong></td><td><code>persist_df</code></td><td></td><td>Persist dataframe to a file or cloud storage object.</td></tr><tr><td>18</td><td><strong>Create Files Single View</strong></td><td><code>create_files_single_view</code></td><td></td><td>Create the files associated with a single view.</td></tr><tr><td>19</td><td><strong>Persist Relocations</strong></td><td><code>persist_df</code></td><td></td><td>Persist dataframe to a file or cloud storage object.</td></tr><tr><td>20</td><td><strong>Persist Trajectories</strong></td><td><code>persist_df</code></td><td></td><td>Persist dataframe to a file or cloud storage object.</td></tr><tr><td>21</td><td><strong>Draw Ecograph Map</strong></td><td><code>draw_map</code></td><td></td><td>Creates a map based on the provided layer definitions and configuration.</td></tr><tr><td>22</td><td><strong>Persist Ecograph Map</strong></td><td><code>persist_text</code></td><td></td><td>Persist text to a file or cloud storage object.</td></tr><tr><td>23</td><td><strong>Create Ecograph Widget Single View</strong></td><td><code>create_map_widget_single_view</code></td><td></td><td>Create a map widget with a single view.</td></tr><tr><td>24</td><td><strong>Merge Widget Views</strong></td><td><code>merge_widget_views</code></td><td></td><td>Merge widgets with the same `title` and `widget_type`.</td></tr><tr><td>25</td><td><strong>Gather Dashboard</strong></td><td><code>gather_dashboard</code></td><td></td><td></td></tr></tbody>
+      <thead><tr><th>#</th><th>Step (id)</th><th>Task</th><th>Fixed settings / notes</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Set Workflow Details (<code>workflow_details</code>)</td><td><code>set_workflow_details</code></td><td>Form: name, description.</td></tr>
+        <tr><td>2</td><td>Set Time Range (<code>time_range</code>)</td><td><code>set_time_range</code></td><td><code>time_format: '%d %b %Y %H:%M:%S'</code></td></tr>
+        <tr><td>3</td><td>Connect to Earthranger (<code>er_connection</code>)</td><td><code>set_er_connection</code></td><td>Form: data source.</td></tr>
+        <tr><td>4</td><td>Set Groupers (<code>groupers</code>)</td><td><code>set_groupers</code></td><td>Form restricted to <em>All</em> (empty) or Category → <code>subject_name</code>; see <a href="#overrides">form overrides</a>.</td></tr>
+        <tr><td>5</td><td>Subject Group (<code>subjectgroup_observations</code>)</td><td><code>get_subjectgroup_observations</code></td><td><code>include_details: true</code>, <code>filter: clean</code>, <code>raise_on_empty: true</code>, no subject-source details, no subject additional fields.</td></tr>
+        <tr><td>6</td><td>Set Base Maps (<code>base_maps</code>)</td><td><code>set_base_maps</code></td><td>Form (advanced). Default: ArcGIS World Topo 100% + World Imagery 50%.</td></tr>
+        <tr><td>7</td><td>Process Relocs (<code>relocs</code>)</td><td><code>process_relocations</code></td><td>Drops fixes at (180, 90), (0, 0), (1, 1). Keeps <code>groupby_col, fixtime, junk_status, geometry</code> and subject name, hex, sex, subtype, created-at; strips the <code>extra__</code>/<code>subject__</code> prefixes.</td></tr>
+        <tr><td>8</td><td>Trajectory Segment Filter (<code>relocs_to_traj</code>)</td><td><code>relocations_to_trajectory</code></td><td>Form (advanced): segment length / duration / speed limits. Fails if no segments remain.</td></tr>
+        <tr><td>9</td><td>Add Temporal Index (<code>temporal_index</code>)</td><td><code>add_temporal_index</code></td><td><code>time_col: segment_start</code>, <code>cast_to_datetime: true</code>, <code>format: mixed</code>.</td></tr>
+        <tr><td>10</td><td>Map Columns (<code>columns</code>)</td><td><code>map_columns</code></td><td>Renames <code>extra__name → subject_name</code> (<code>raise_if_not_found: true</code>). This is the column the Subject Name grouper splits on.</td></tr>
+        <tr><td>11</td><td>Split Groups (<code>groups</code>)</td><td><code>split_groups</code></td><td>One <code>(view key, table)</code> pair per view.</td></tr>
+        <tr><td>12</td><td>Build Ecograph (<code>ecograph_gdf</code>)</td><td><code>generate_ecograph_gdf</code> (ext-ste)</td><td><code>movement_covariate: speed</code>, <code>network_metric: null</code>, <code>dist_col: dist_meters</code>, <code>resolution: null</code>, <code>radius: 2</code>, <code>cutoff: null</code>, <code>tortuosity_length: 3</code>, <code>interpolation: mean</code>. Form (advanced): <code>step_length</code>.</td></tr>
+        <tr><td>13</td><td>Sort Ecograph Values (<code>sort_ecograph</code>)</td><td><code>sort_values</code></td><td><code>column_name: value</code>, ascending, NaN last.</td></tr>
+        <tr><td>14</td><td>Apply Classification (<code>classification</code>)</td><td><code>apply_classification</code></td><td><code>value → value_bins</code>; <code>equal_interval</code>, <code>k: 5</code>; range labels, 1 decimal.</td></tr>
+        <tr><td>15</td><td>Apply Color Map (<code>color_map</code>)</td><td><code>apply_color_map</code></td><td><code>value_bins → value_colors</code>, <code>RdYlGn_r</code>.</td></tr>
+        <tr><td>16</td><td>Create Geojson Layer (<code>geojson_layer</code>)</td><td><code>create_geojson_layer</code></td><td>Fill <code>value_colors</code>, opacity 0.55, black 0.35 px outline, pickable; tooltip <code>value_bins</code>; legend "Legend" from <code>value_bins</code>/<code>value_colors</code>, ascending.</td></tr>
+        <tr><td>17</td><td>Compute View State From Gdf (<code>view_state_from_gdf</code>)</td><td><code>compute_view_state_from_gdf</code> (ext-ste)</td><td>Pitch 0, bearing 0, max zoom 18.</td></tr>
+        <tr><td>18</td><td>Persist Ecograph (<code>persist_ecograph</code>)</td><td><code>persist_df</code></td><td>GeoParquet, one per view. Saves the unsorted, unclassified grid (<code>value</code>, <code>geometry</code>).</td></tr>
+        <tr><td>19</td><td>Create Files Single View (<code>files_single_view</code>)</td><td><code>create_files_single_view</code></td><td><code>map</code> over <code>(view, files)</code>; tags each GeoParquet with its view key.</td></tr>
+        <tr><td>20</td><td>Persist Relocations (<code>persist_relocs</code>)</td><td><code>persist_df</code></td><td>GeoParquet, whole group (not per view).</td></tr>
+        <tr><td>21</td><td>Persist Trajectories (<code>persist_trajectories</code>)</td><td><code>persist_df</code></td><td>GeoParquet of the <code>map_columns</code> output, whole group.</td></tr>
+        <tr><td>22</td><td>Pair up geo_layers, view_state by group (<code>draw_ecograph_map_by_group</code>)</td><td><code>groupbykey</code></td><td>Zips each view's layer and view state.</td></tr>
+        <tr><td>23</td><td>Draw Ecograph Map (<code>draw_ecograph_map</code>)</td><td><code>draw_map</code></td><td>Interactive HTML, no title, legend bottom-right, max zoom 20, base maps from step 6.</td></tr>
+        <tr><td>24</td><td>Persist Ecograph Map (<code>persist_ecograph_map</code>)</td><td><code>persist_text</code></td><td>One HTML per view.</td></tr>
+        <tr><td>25</td><td>Create Ecograph Widget Single View (<code>ecograph_widget</code>)</td><td><code>create_map_widget_single_view</code></td><td>Title "Map"; <code>map</code> over <code>(view, data)</code>; never skipped.</td></tr>
+        <tr><td>26</td><td>Merge Widget Views (<code>merged_widget_views</code>)</td><td><code>merge_widget_views</code></td><td>One grouped "Map" widget.</td></tr>
+        <tr><td>27</td><td>Gather Dashboard (<code>dashboard</code>)</td><td><code>gather_dashboard</code></td><td>Called <strong>once</strong>, with <code>files</code> as a plain input; see <a href="#dashboard">below</a>.</td></tr>
+      </tbody>
+    </table>
+
+    <h2>How the raster is built</h2>
+    <ol>
+      <li>The grid's cell size is <code>resolution</code> if set (it is <code>null</code> here), else <code>step_length</code> (form, default 2000 m), else the mean of <code>dist_meters</code> (the form's <em>Auto</em> option sends <code>null</code>).</li>
+      <li>The grid covers the view's tracks in their UTM zone, padded by one cell.</li>
+      <li>Each segment's <code>speed_kmhr</code> is credited to the cell where the segment <strong>starts</strong>. With <code>tortuosity_length: 3</code>, the last two segments of each subject's track are not credited.</li>
+      <li>Each cell's value is the mean of its segments' speeds, first per subject and then across subjects (<code>interpolation: mean</code>). Cells with no segments are left out.</li>
+      <li>The raster is written to an in-memory GeoTIFF and read straight back as square polygons: one row per cell, with columns <code>value</code> and <code>geometry</code>.</li>
+    </ol>
+
+    <h3>Why sort before classifying</h3>
+    <p><code>apply_color_map</code> hands out colours in the order the class labels first appear in the table. Without sorting, the first cell (wherever it happens to be) took the first colour, so the legend's ranges and colours came out scrambled. Sorting by <code>value</code> ascending makes the lowest class appear first. The colour ramp then runs in class order: dark green for the slowest class through to red for the fastest.</p>
+
+    <h2 id="dashboard">How views and files reach the dashboard</h2>
+    <p>The grouped steps return lists of <code>(view key, value)</code> pairs. Two wiring rules matter:</p>
+    <ul>
+      <li><strong>Steps that need the view key use <code>map</code> with <code>argnames: [view, …]</code></strong>. That covers <code>files_single_view</code> and <code>ecograph_widget</code>. With <code>mapvalues</code>, the key isn't passed in, so every file view had <code>view = None</code>.</li>
+      <li><strong><code>gather_dashboard</code> runs once</strong>, with <code>files: ${{ workflow.files_single_view.return }}</code> in <code>partial</code>. It accepts a list of file views and merges them by view key. Using <code>mapvalues</code> over files here produced one dashboard per subject, a list the runner can't display. That's why an earlier run had outputs but no dashboard.</li>
+    </ul>
+    <p><code>gather_dashboard</code> asserts that every file view key is <code>None</code> or one of the widget view keys, so the files and widgets must come from the same <code>split_groups</code> output.</p>
+
+    <h2 id="overrides">Run form overrides (<code>rjsf-overrides</code>)</h2>
+    <table>
+      <thead><tr><th>Field</th><th>Override</th></tr></thead>
+      <tbody>
+        <tr><td><code>subjectgroup_observations.subject_group_name</code></td><td>Drop-down of the chosen data source's subject groups (<code>EarthRangerEnumResolver</code>, <code>type: subject_group_name</code>).</td></tr>
+        <tr><td><code>groupers.groupers</code></td><td>Title "Group by"; items limited to one option, <em>Category</em>, whose <code>index_name</code> can only be <code>subject_name</code> ("Subject Name"). Time and spatial groupers are removed. An empty list gives the <em>All</em> view.</td></tr>
+        <tr><td><code>ecograph_gdf.step_length</code></td><td>Title "Step Length (m)" with a plain-language description. The <code>anyOf</code> branches are labelled <em>Fixed value (m)</em> (integer, exclusive bounds 500 to 100000) and <em>Auto (use average step distance)</em> (<code>null</code>). Without the labels, the form shows "Option 1 / Option 2". The default stays 2000, from the task.</td></tr>
+      </tbody>
     </table>
 
     <h2>Task packages</h2>
     <table>
-      <thead><tr><th>Package</th><th>Version</th><th>Channel</th></tr></thead>
-      <tbody><tr><td><code>ecoscope-platform</code></td><td>==2.28.0</td><td>https://repo.prefix.dev/ecoscope-workflows/</td></tr><tr><td><code>pydeck</code></td><td>==0.9.2</td><td>conda-forge</td></tr><tr><td><code>ecoscope-workflows-ext-custom</code></td><td>==0.1.4</td><td>https://repo.prefix.dev/ecoscope-workflows-custom/</td></tr><tr><td><code>ecoscope-workflows-ext-ste</code></td><td>==0.0.34</td><td>https://repo.prefix.dev/ecoscope-workflows-custom/</td></tr><tr><td><code>ecoscope-workflows-ext-mnc</code></td><td>==1.0.5</td><td>https://repo.prefix.dev/ecoscope-workflows-custom/</td></tr></tbody>
+      <thead><tr><th>Package</th><th>Version</th><th>Channel</th><th>Used for</th></tr></thead>
+      <tbody>
+        <tr><td><code>ecoscope-platform</code></td><td>==2.28.0</td><td>https://repo.prefix.dev/ecoscope-workflows/</td><td>All steps except the two below</td></tr>
+        <tr><td><code>ecoscope-workflows-ext-ste</code></td><td>==0.0.34</td><td>https://repo.prefix.dev/ecoscope-workflows-custom/</td><td><code>generate_ecograph_gdf</code>, <code>compute_view_state_from_gdf</code></td></tr>
+        <tr><td><code>pydeck</code></td><td>==0.9.2</td><td>conda-forge</td><td>Map rendering</td></tr>
+        <tr><td><code>ecoscope-workflows-ext-custom</code></td><td>==0.1.4</td><td>https://repo.prefix.dev/ecoscope-workflows-custom/</td><td>Not used by any step at present</td></tr>
+        <tr><td><code>ecoscope-workflows-ext-mnc</code></td><td>==1.0.5</td><td>https://repo.prefix.dev/ecoscope-workflows-custom/</td><td>Not used by any step at present</td></tr>
+      </tbody>
     </table>
+
+    <h2>Metadata and thumbnail</h2>
+    <p><code>spec.yaml</code>'s <code>metadata</code> block (name, description, maintainer, licence, keywords) is what the template catalogue shows. <code>metadata.thumbnail</code> points to <code>resources/thumbnail.png</code> (2560×1440, under the 5 MB limit). The thumbnail uses <strong>synthetic data</strong>: a made-up 120-day, 3-hourly random-walk track that alternates slow and fast bouts. It runs through this spec's own steps (trajectory, ecograph at 2000 m, sort, classify, colour, layer, map) and is screenshotted in headless Chrome. Don't replace it with a screenshot of real subjects' data.</p>
 
     <h2>Recompiling</h2>
     <p><code>spec.yaml</code> is the source; <code>ecoscope-workflows-mean-speed-raster-workflow/</code> is generated from it by wt-compiler.</p>
     <pre><code>./dev/recompile.sh --update   # keeps the lock file and bumps VERSION.yaml
 ./dev/recompile.sh --install  # a new lock file, and the packages installed</code></pre>
+    <p class="note">Both use <code>--clobber</code>, which deletes the generated folder <em>including its <code>.pixi</code> environment</em>. Run <code>pixi install</code> in <code>ecoscope-workflows-mean-speed-raster-workflow/</code> before running anything from it again.</p>
+    <p class="note">This repo is also compiled from an EcoWorkbench design. EcoWorkbench rewrites <code>spec.yaml</code> from the design each time it compiles the repo. If you edit <code>spec.yaml</code> by hand, re-import it into the design (or make the same edits there) before compiling from EcoWorkbench, or the hand edits are lost. <code>README.md</code> and <code>docs/</code> are only written once and are safe to edit.</p>
 
     <h2>Testing</h2>
     <p>Each case in <code>test-cases.yaml</code> runs the workflow with its settings:</p>
@@ -47,7 +126,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>mean-speed-raster &middot; Wildlife Dynamics</p>
+    <p>Mean Speed Raster &middot; Wildlife Dynamics</p>
   </footer>
 </body>
 </html>

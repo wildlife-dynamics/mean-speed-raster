@@ -1,56 +1,109 @@
 id: mean_speed_raster
+
+metadata:
+  name: Mean Speed Raster
+  description: >-
+    Turns an EarthRanger subject group's GPS tracks into a grid of mean movement speed:
+    each cell holds the average speed of the track segments passing through it. Cells are
+    sorted and binned into five equal-interval classes and coloured green (slow) to red
+    (fast) on an interactive map, one view per subject or one for the whole group.
+  maintainers:
+  - name: Tevin Temu
+    email: tevin@wildlifedynamics.com
+  license: BSD-3-Clause
+  readme: README.md
+  documentation: docs/index.html
+  keywords: [movement, speed, ecograph, raster, trajectories, earthranger]
+  thumbnail: resources/thumbnail.png
+
 requirements:
 - name: ecoscope-platform
   version: ==2.28.0
   channel: https://repo.prefix.dev/ecoscope-workflows/
+
 - name: pydeck
   version: ==0.9.2
   channel: conda-forge
+
 - name: ecoscope-workflows-ext-custom
   version: ==0.1.4
   channel: https://repo.prefix.dev/ecoscope-workflows-custom/
+
 - name: ecoscope-workflows-ext-ste
   version: ==0.0.34
   channel: https://repo.prefix.dev/ecoscope-workflows-custom/
+
 - name: ecoscope-workflows-ext-mnc
   version: ==1.0.5
   channel: https://repo.prefix.dev/ecoscope-workflows-custom/
+
 task-instance-defaults:
   skipif:
     conditions:
     - any_is_empty_df
     - any_dependency_skipped
+
+rjsf-overrides:
+  properties:
+    subjectgroup_observations.properties.subject_group_name.ecoscope:transform:
+    - transformer: EarthRangerEnumResolver
+      transformer_kws:
+        type: subject_group_name
+        depends_on: properties.er_connection.properties.data_source.properties.name
+
+    # Groupers: only "All" (leave the list empty) or Category → Subject Name.
+    groupers.properties.groupers.title: Group by
+    groupers.properties.groupers.description: >-
+      Add a Subject Name entry to split the dashboard into one view per subject.
+      Leave it empty to show all subjects in a single view.
+    groupers.properties.groupers.items.anyOf:
+    - type: object
+      title: Category
+      properties:
+        index_name:
+          title: Category
+          type: string
+          oneOf:
+          - const: subject_name
+            title: Subject Name
+          default: subject_name
+      required:
+      - index_name
+
+    # Step length: label the two anyOf branches so the choice is self-explanatory.
+    ecograph_gdf.properties.step_length.title: Step Length (m)
+    ecograph_gdf.properties.step_length.description: >-
+      Sets the cell (pixel) size of the mean speed raster, in meters. Smaller values give a
+      more detailed raster but take longer to build; larger values give a coarser raster.
+      Choose "Fixed value" to set it yourself (default 2000 m, must be between 500 and
+      100000), or "Auto" to use the average distance between consecutive GPS fixes.
+    ecograph_gdf.properties.step_length.anyOf:
+    - type: integer
+      title: Fixed value (m)
+      exclusiveMinimum: 500
+      exclusiveMaximum: 100000
+    - type: "null"
+      title: Auto (use average step distance)
+
 workflow:
-- name: Connect to Earthranger
-  id: er_connection
-  task: set_er_connection
-- name: Set Base Maps
-  id: base_maps
-  task: set_base_maps
-  partial:
-    base_maps:
-    - url: https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}
-      opacity: 1
-      max_zoom: 20
-      min_zoom: 0
-    - url: https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}
-      opacity: 0.5
-      max_zoom: 20
-      min_zoom: 0
 - name: Set Workflow Details
   id: workflow_details
   task: set_workflow_details
+
 - name: Set Time Range
   id: time_range
   task: set_time_range
   partial:
     time_format: '%d %b %Y %H:%M:%S'
+
+- name: Connect to Earthranger
+  id: er_connection
+  task: set_er_connection
+
 - name: Set Groupers
   id: groupers
   task: set_groupers
-  partial:
-    groupers:
-    - index_name: subject_name
+
 - name: Subject Group
   id: subjectgroup_observations
   task: get_subjectgroup_observations
@@ -62,6 +115,11 @@ workflow:
     include_subjectsource_details: false
     filter: clean
     include_subject_additional: false
+
+- name: Set Base Maps
+  id: base_maps
+  task: set_base_maps
+
 - name: Process Relocs
   id: relocs
   task: process_relocations
@@ -84,18 +142,13 @@ workflow:
       y: 0
     - x: 1
       y: 1
+
 - name: Trajectory Segment Filter
   id: relocs_to_traj
   task: relocations_to_trajectory
   partial:
     relocations: ${{ workflow.relocs.return }}
-    trajectory_segment_filter:
-      min_length_meters: 0.001
-      max_length_meters: 100000
-      min_time_secs: 1
-      max_time_secs: 172800
-      min_speed_kmhr: 0.01
-      max_speed_kmhr: 500
+
 - name: Add Temporal Index
   id: temporal_index
   task: add_temporal_index
@@ -105,6 +158,7 @@ workflow:
     time_col: segment_start
     cast_to_datetime: true
     format: mixed
+
 - name: Map Columns
   id: columns
   task: map_columns
@@ -116,12 +170,14 @@ workflow:
     retain_columns: []
     raise_if_not_found: true
     duplicate_strategy: suffix
+
 - name: Split Groups
   id: groups
   task: split_groups
   partial:
     groupers: ${{ workflow.groupers.return }}
     df: ${{ workflow.columns.return }}
+
 - name: Build Ecograph
   id: ecograph_gdf
   task: generate_ecograph_gdf
@@ -130,6 +186,7 @@ workflow:
     network_metric: null
     dist_col: dist_meters
     resolution: null
+    cutoff: null
     radius: 2
     tortuosity_length: 3
     interpolation: mean
@@ -137,6 +194,19 @@ workflow:
     argnames:
     - gdf
     argvalues: ${{ workflow.groups.return }}
+
+- name: Sort Ecograph Values
+  id: sort_ecograph
+  task: sort_values
+  partial:
+    column_name: value
+    ascending: true
+    na_position: last
+  mapvalues:
+    argnames:
+    - df
+    argvalues: ${{ workflow.ecograph_gdf.return }}
+
 - name: Apply Classification
   id: classification
   task: apply_classification
@@ -154,7 +224,8 @@ workflow:
   mapvalues:
     argnames:
     - df
-    argvalues: ${{ workflow.ecograph_gdf.return }}
+    argvalues: ${{ workflow.sort_ecograph.return }}
+
 - name: Apply Color Map
   id: color_map
   task: apply_color_map
@@ -166,6 +237,7 @@ workflow:
     argnames:
     - df
     argvalues: ${{ workflow.classification.return }}
+
 - name: Create Geojson Layer
   id: geojson_layer
   task: create_geojson_layer
@@ -208,6 +280,7 @@ workflow:
     argnames:
     - geodataframe
     argvalues: ${{ workflow.color_map.return }}
+
 - name: Compute View State From Gdf
   id: view_state_from_gdf
   task: compute_view_state_from_gdf
@@ -219,6 +292,7 @@ workflow:
     argnames:
     - gdf
     argvalues: ${{ workflow.color_map.return }}
+
 - name: Persist Ecograph
   id: persist_ecograph
   task: persist_df
@@ -230,13 +304,16 @@ workflow:
     argnames:
     - df
     argvalues: ${{ workflow.ecograph_gdf.return }}
+
 - name: Create Files Single View
   id: files_single_view
   task: create_files_single_view
-  mapvalues:
+  map:
     argnames:
+    - view
     - files
     argvalues: ${{ workflow.persist_ecograph.return }}
+
 - name: Persist Relocations
   id: persist_relocs
   task: persist_df
@@ -245,6 +322,7 @@ workflow:
     df: ${{ workflow.relocs.return }}
     filetype: geoparquet
     filename: null
+
 - name: Persist Trajectories
   id: persist_trajectories
   task: persist_df
@@ -253,6 +331,7 @@ workflow:
     df: ${{ workflow.columns.return }}
     filetype: geoparquet
     filename: null
+
 - name: Pair up geo_layers, view_state by group
   id: draw_ecograph_map_by_group
   task: groupbykey
@@ -260,6 +339,7 @@ workflow:
     iterables:
     - ${{ workflow.geojson_layer.return }}
     - ${{ workflow.view_state_from_gdf.return }}
+
 - name: Draw Ecograph Map
   id: draw_ecograph_map
   task: draw_map
@@ -277,6 +357,7 @@ workflow:
     - geo_layers
     - view_state
     argvalues: ${{ workflow.draw_ecograph_map_by_group.return }}
+
 - name: Persist Ecograph Map
   id: persist_ecograph_map
   task: persist_text
@@ -286,6 +367,7 @@ workflow:
     argnames:
     - text
     argvalues: ${{ workflow.draw_ecograph_map.return }}
+
 - name: Create Ecograph Widget Single View
   id: ecograph_widget
   task: create_map_widget_single_view
@@ -299,11 +381,13 @@ workflow:
     - view
     - data
     argvalues: ${{ workflow.persist_ecograph_map.return }}
+
 - name: Merge Widget Views
   id: merged_widget_views
   task: merge_widget_views
   partial:
     widgets: ${{ workflow.ecograph_widget.return }}
+
 - name: Gather Dashboard
   id: dashboard
   task: gather_dashboard
@@ -312,21 +396,4 @@ workflow:
     details: ${{ workflow.workflow_details.return }}
     groupers: ${{ workflow.groupers.return }}
     widgets: ${{ workflow.merged_widget_views.return }}
-  mapvalues:
-    argnames:
-    - files
-    argvalues: ${{ workflow.files_single_view.return }}
-rjsf-overrides:
-  uiSchema:
-    ui:order:
-    - workflow_details
-    - time_range
-    - er_connection
-    - subjectgroup_observations
-    - ecograph_gdf
-  properties:
-    subjectgroup_observations.properties.subject_group_name.ecoscope:transform:
-    - transformer: EarthRangerEnumResolver
-      transformer_kws:
-        type: subject_group_name
-        depends_on: properties.er_connection.properties.data_source.properties.name
+    files: ${{ workflow.files_single_view.return }}

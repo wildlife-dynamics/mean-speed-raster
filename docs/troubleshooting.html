@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Troubleshooting · mean-speed-raster</title>
+  <title>Troubleshooting · Mean Speed Raster</title>
   <link rel="stylesheet" href="assets/style.css" />
 </head>
 <body>
   <header class="site-header">
     <div class="bar">
-      <a class="brand" href="index.html">mean-speed-raster</a>
+      <a class="brand" href="index.html">Mean Speed Raster</a>
       <nav>
         <a href="index.html">Overview</a>
         <a href="user-guide.html">User Guide</a>
@@ -21,21 +21,58 @@
 
   <main>
     <h1>Troubleshooting</h1>
-    <p class="lede">Common issues while configuring, running or changing mean-speed-raster, and how to resolve them.</p>
+    <p class="lede">Common issues while configuring, running or changing Mean Speed Raster, and how to resolve them.</p>
 
     <h2>Configuration &amp; connections</h2>
 
     <div class="error-block">
       <p class="symptom">A data source connection fails or times out</p>
-      <p>Check the server URL and credentials in the connection, and that you can sign in to the same server in a browser with them. The account needs API access to the data the workflow asks for.</p>
+      <p>Check the server URL and credentials in the connection, and that you can sign in to the same server in a browser with them. The account needs API access to the subject group's observations.</p>
     </div>
 
     <div class="error-block">
-      <p class="symptom">The run returns no data</p>
-      <p>Names typed into the settings (a subject group, an event type) must match the data source exactly, including capitals. Widen the time range if it's short.</p>
+      <p class="symptom">The run fails with no observations, or "No Trajectory data left after applying segment filter"</p>
+      <p>The subject group had no clean fixes in the time range, or every segment fell outside the Trajectory Segment Filter limits. Widen the time range, check the group has collared subjects reporting in that period, and loosen the filter's limits.</p>
+    </div>
+
+    <h2>Results</h2>
+
+    <div class="error-block">
+      <p class="symptom">Big gaps between cells, or only a few scattered cells</p>
+      <p>The cells are smaller than the distance between fixes, so many cells are crossed without a segment starting in them. Raise <strong>Step Length</strong> (e.g. 3000–5000 m) or switch it to <strong>Auto</strong>.</p>
+    </div>
+
+    <div class="error-block">
+      <p class="symptom">A few red cells far from the rest, or a very wide top speed class</p>
+      <p>GPS spikes produce unrealistically fast segments, which stretch the equal-interval classes. Lower <strong>Maximum Segment Speed</strong> in the Trajectory Segment Filter to a realistic ceiling for the species (e.g. 9 km/h for elephants).</p>
+    </div>
+
+    <div class="error-block">
+      <p class="symptom">The same colour means different speeds for different subjects</p>
+      <p>Expected: classes are equal-interval across each view's own speeds. Read each view's legend; use the <em>All</em> view (empty Group by) to compare subjects on one scale.</p>
+    </div>
+
+    <div class="error-block">
+      <p class="symptom">The run succeeds and files are written, but no dashboard appears</p>
+      <p><code>gather_dashboard</code> must run once, not once per view. In <code>spec.yaml</code> it should take <code>files: ${{ workflow.files_single_view.return }}</code> under <code>partial</code>, with no <code>mapvalues</code>. <code>files_single_view</code> should use <code>map</code> with <code>argnames: [view, files]</code>. See the <a href="technical-guide.html#dashboard">Technical Guide</a>.</p>
+    </div>
+
+    <div class="error-block">
+      <p class="symptom">Legend colours are out of order</p>
+      <p>The <strong>Sort Ecograph Values</strong> step must sit between Build Ecograph and Apply Classification, and classification must read from <code>sort_ecograph</code>. Colours are handed out in the order classes first appear in the table.</p>
     </div>
 
     <h2>Developing</h2>
+
+    <div class="error-block">
+      <p class="symptom">After recompiling, running fails with "Library not loaded: libblas" or a missing <code>.pixi</code> folder</p>
+      <p><code>--clobber</code> deleted the generated folder's environment. Run <code>pixi install</code> in <code>ecoscope-workflows-mean-speed-raster-workflow/</code>.</p>
+    </div>
+
+    <div class="error-block">
+      <p class="symptom">Hand edits to <code>spec.yaml</code> disappeared</p>
+      <p>EcoWorkbench rewrites <code>spec.yaml</code> from its design each time it compiles the repo. Bring the edits into the design before compiling from EcoWorkbench.</p>
+    </div>
 
     <div class="error-block">
       <p class="symptom">CI says the generated files differ from the committed ones</p>
@@ -54,7 +91,7 @@
   </main>
 
   <footer class="site-footer">
-    <p>mean-speed-raster &middot; Wildlife Dynamics</p>
+    <p>Mean Speed Raster &middot; Wildlife Dynamics</p>
   </footer>
 </body>
 </html>

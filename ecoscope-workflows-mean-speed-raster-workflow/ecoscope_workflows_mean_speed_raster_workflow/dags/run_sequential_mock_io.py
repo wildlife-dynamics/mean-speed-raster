@@ -14,7 +14,6 @@ from ecoscope.platform.tasks.config import set_workflow_details as set_workflow_
 from ecoscope.platform.tasks.filter import set_time_range as set_time_range
 from ecoscope.platform.tasks.groupby import set_groupers as set_groupers
 from ecoscope.platform.tasks.io import set_er_connection as set_er_connection
-from ecoscope.platform.tasks.results import set_base_maps as set_base_maps
 from ecoscope.platform.tasks.skip import (
     any_dependency_skipped as any_dependency_skipped,
 )
@@ -49,6 +48,7 @@ from ecoscope.platform.tasks.results import (
 from ecoscope.platform.tasks.results import draw_map as draw_map
 from ecoscope.platform.tasks.results import gather_dashboard as gather_dashboard
 from ecoscope.platform.tasks.results import merge_widget_views as merge_widget_views
+from ecoscope.platform.tasks.results import set_base_maps as set_base_maps
 from ecoscope.platform.tasks.skip import never as never
 from ecoscope.platform.tasks.transformation import (
     add_temporal_index as add_temporal_index,
@@ -58,6 +58,7 @@ from ecoscope.platform.tasks.transformation import (
 )
 from ecoscope.platform.tasks.transformation import apply_color_map as apply_color_map
 from ecoscope.platform.tasks.transformation import map_columns as map_columns
+from ecoscope.platform.tasks.transformation import sort_values as sort_values
 from ecoscope_workflows_ext_ste.tasks.results import (
     generate_ecograph_gdf as generate_ecograph_gdf,
 )
@@ -71,56 +72,6 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
 
     if validate_params_schema:
         _validate(params, _metadata.load_params_schema())
-
-    er_connection = (
-        task(set_er_connection)
-        .validate()
-        .set_task_instance_id("er_connection")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[
-                any_is_empty_df,
-                any_dependency_skipped,
-            ],
-            unpack_depth=1,
-        )
-        .partial(**(params.get("er_connection") or {}))
-        .call()
-    )
-
-    base_maps = (
-        task(set_base_maps)
-        .validate()
-        .set_task_instance_id("base_maps")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[
-                any_is_empty_df,
-                any_dependency_skipped,
-            ],
-            unpack_depth=1,
-        )
-        .partial(
-            base_maps=[
-                {
-                    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-                    "opacity": 1,
-                    "max_zoom": 20,
-                    "min_zoom": 0,
-                },
-                {
-                    "url": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-                    "opacity": 0.5,
-                    "max_zoom": 20,
-                    "min_zoom": 0,
-                },
-            ],
-            **(params.get("base_maps") or {}),
-        )
-        .call()
-    )
 
     workflow_details = (
         task(set_workflow_details)
@@ -156,6 +107,23 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
+    er_connection = (
+        task(set_er_connection)
+        .validate()
+        .set_task_instance_id("er_connection")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(**(params.get("er_connection") or {}))
+        .call()
+    )
+
     groupers = (
         task(set_groupers)
         .validate()
@@ -169,9 +137,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             ],
             unpack_depth=1,
         )
-        .partial(
-            groupers=[{"index_name": "subject_name"}], **(params.get("groupers") or {})
-        )
+        .partial(**(params.get("groupers") or {}))
         .call()
     )
 
@@ -198,6 +164,23 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             include_subject_additional=False,
             **(params.get("subjectgroup_observations") or {}),
         )
+        .call()
+    )
+
+    base_maps = (
+        task(set_base_maps)
+        .validate()
+        .set_task_instance_id("base_maps")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(**(params.get("base_maps") or {}))
         .call()
     )
 
@@ -250,18 +233,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             ],
             unpack_depth=1,
         )
-        .partial(
-            relocations=relocs,
-            trajectory_segment_filter={
-                "min_length_meters": 0.001,
-                "max_length_meters": 100000,
-                "min_time_secs": 1,
-                "max_time_secs": 172800,
-                "min_speed_kmhr": 0.01,
-                "max_speed_kmhr": 500,
-            },
-            **(params.get("relocs_to_traj") or {}),
-        )
+        .partial(relocations=relocs, **(params.get("relocs_to_traj") or {}))
         .call()
     )
 
@@ -349,12 +321,35 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             network_metric=None,
             dist_col="dist_meters",
             resolution=None,
+            cutoff=None,
             radius=2,
             tortuosity_length=3,
             interpolation="mean",
             **(params.get("ecograph_gdf") or {}),
         )
         .mapvalues(argnames=["gdf"], argvalues=groups)
+    )
+
+    sort_ecograph = (
+        task(sort_values)
+        .validate()
+        .set_task_instance_id("sort_ecograph")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(
+            column_name="value",
+            ascending=True,
+            na_position="last",
+            **(params.get("sort_ecograph") or {}),
+        )
+        .mapvalues(argnames=["df"], argvalues=ecograph_gdf)
     )
 
     classification = (
@@ -382,7 +377,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             classification_options={"scheme": "equal_interval", "k": 5},
             **(params.get("classification") or {}),
         )
-        .mapvalues(argnames=["df"], argvalues=ecograph_gdf)
+        .mapvalues(argnames=["df"], argvalues=sort_ecograph)
     )
 
     color_map = (
@@ -519,7 +514,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             unpack_depth=1,
         )
         .partial(**(params.get("files_single_view") or {}))
-        .mapvalues(argnames=["files"], argvalues=persist_ecograph)
+        .map(argnames=["view", "files"], argvalues=persist_ecograph)
     )
 
     persist_relocs = (
@@ -686,9 +681,10 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             details=workflow_details,
             groupers=groupers,
             widgets=merged_widget_views,
+            files=files_single_view,
             **(params.get("dashboard") or {}),
         )
-        .mapvalues(argnames=["files"], argvalues=files_single_view)
+        .call()
     )
 
     return dashboard

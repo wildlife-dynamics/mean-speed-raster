@@ -3,5 +3,7 @@ author:
 - name: Tevin Temu
   organization: Wildlife Dynamics
   email: tevin@wildlifedynamics.com
-description: ''
+description: >-
+  Turns an EarthRanger subject group's GPS tracks into a grid of mean movement speed (km/h),
+  coloured green (slow) to red (fast) on an interactive map, one view per subject or one for the group.
 citation: []

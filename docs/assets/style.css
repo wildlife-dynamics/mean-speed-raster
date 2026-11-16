@@ -84,7 +84,7 @@ h2 {
 
 h3 {
   font-size: 1.1em;
-  color: #40916c;
+  color: var(--green-mid);
   margin-top: 1.5em;
 }
 
@@ -217,10 +217,13 @@ footer.site-footer {
   max-width: 860px;
   margin: 0 auto;
   padding: 24px;
-  color: #777;
+  color: #666;
   font-size: 0.9em;
   border-top: 1px solid var(--grey-border);
   text-align: center;
 }
 
 footer.site-footer a { color: var(--green-mid); }
+
+figure { margin: 16px 0; }
+figcaption { color: #555; font-size: 0.9em; margin-top: 6px; }
