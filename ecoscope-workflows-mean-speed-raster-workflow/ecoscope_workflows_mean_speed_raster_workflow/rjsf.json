@@ -349,7 +349,7 @@
           "anyOf": [
             {
               "type": "integer",
-              "title": "Fixed value (m)",
+              "title": "Grid Size (m)",
               "exclusiveMinimum": 500,
               "exclusiveMaximum": 100000
             },
@@ -359,14 +359,14 @@
             }
           ],
           "default": 2000,
-          "description": "Sets the cell (pixel) size of the mean speed raster, in meters. Smaller values give a more detailed raster but take longer to build; larger values give a coarser raster. Choose \"Fixed value\" to set it yourself (default 2000 m, must be between 500 and 100000), or \"Auto\" to use the average distance between consecutive GPS fixes.",
+          "description": "Sets the cell (pixel) size of the mean speed grid, in meters. Smaller values give a more detailed grid but take longer to build; larger values give a coarser grid. Choose \"Grid Size (m)\" to set it yourself (default 2000 m, must be between 500 and 100000), or \"Auto\" to use the average distance between consecutive GPS fixes.",
           "ecoscope:advanced": true,
-          "title": "Step Length (m)"
+          "title": "Grid Size Determination"
         }
       },
       "required": [],
       "type": "object",
-      "title": "Build Ecograph"
+      "title": "Mean Speed Grid"
     }
   },
   "$defs": {

@@ -8,12 +8,37 @@ metadata:
     sorted and binned into five equal-interval classes and coloured green (slow) to red
     (fast) on an interactive map, one view per subject or one for the whole group.
   maintainers:
-  - name: Tevin Temu
-    email: tevin@wildlifedynamics.com
+    - name: Tevin Temu
+      email: tevin@wildlifedynamics.com
+      role: owner
+  outputs:
+    - name: Mean Speed Dashboard
+      type: dashboard
+      description: >-
+        An interactive mean speed grid map, one view per subject or one for the whole
+        subject group, with the grid data offered as a dashboard download.
+      indicators:
+        - name: Movement speed
+    - name: Mean Speed Grid Map
+      type: map
+      description: >-
+        A square grid over the tracks (2 km cells by default), each cell coloured by the
+        mean speed of the segments passing through it, in five equal-interval classes
+        from green (slow) to red (fast).
+      indicators:
+        - name: Movement speed
+    - name: Mean Speed Data
+      type: file
+      description: >-
+        The mean speed grid per view, the cleaned relocations and the trajectory
+        segments (GeoParquet).
+      indicators:
+        - name: Movement speed
   license: BSD-3-Clause
+  repository: https://github.com/wildlife-dynamics/mean-speed-raster
+  documentation: https://github.com/wildlife-dynamics/mean-speed-raster#readme
   readme: README.md
-  documentation: docs/index.html
-  keywords: [movement, speed, ecograph, raster, trajectories, earthranger]
+  keywords: [movement, speed, ecograph, raster, grid, trajectories, earthranger]
   thumbnail: resources/thumbnail.png
 
 requirements:
@@ -70,16 +95,16 @@ rjsf-overrides:
       required:
       - index_name
 
-    # Step length: label the two anyOf branches so the choice is self-explanatory.
-    ecograph_gdf.properties.step_length.title: Step Length (m)
+    # Step length (the grid cell size): label the two anyOf branches so the choice is self-explanatory.
+    ecograph_gdf.properties.step_length.title: Grid Size Determination
     ecograph_gdf.properties.step_length.description: >-
-      Sets the cell (pixel) size of the mean speed raster, in meters. Smaller values give a
-      more detailed raster but take longer to build; larger values give a coarser raster.
-      Choose "Fixed value" to set it yourself (default 2000 m, must be between 500 and
+      Sets the cell (pixel) size of the mean speed grid, in meters. Smaller values give a
+      more detailed grid but take longer to build; larger values give a coarser grid.
+      Choose "Grid Size (m)" to set it yourself (default 2000 m, must be between 500 and
       100000), or "Auto" to use the average distance between consecutive GPS fixes.
     ecograph_gdf.properties.step_length.anyOf:
     - type: integer
-      title: Fixed value (m)
+      title: Grid Size (m)
       exclusiveMinimum: 500
       exclusiveMaximum: 100000
     - type: "null"
@@ -178,7 +203,7 @@ workflow:
     groupers: ${{ workflow.groupers.return }}
     df: ${{ workflow.columns.return }}
 
-- name: Build Ecograph
+- name: Mean Speed Grid
   id: ecograph_gdf
   task: generate_ecograph_gdf
   partial:

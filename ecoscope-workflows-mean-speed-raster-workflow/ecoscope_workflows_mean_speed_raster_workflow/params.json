@@ -344,7 +344,7 @@
       },
       "required": [],
       "type": "object",
-      "title": "Build Ecograph"
+      "title": "Mean Speed Grid"
     }
   },
   "$defs": {
