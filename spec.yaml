@@ -1,0 +1,332 @@
+id: mean_speed_raster
+requirements:
+- name: ecoscope-platform
+  version: ==2.28.0
+  channel: https://repo.prefix.dev/ecoscope-workflows/
+- name: pydeck
+  version: ==0.9.2
+  channel: conda-forge
+- name: ecoscope-workflows-ext-custom
+  version: ==0.1.4
+  channel: https://repo.prefix.dev/ecoscope-workflows-custom/
+- name: ecoscope-workflows-ext-ste
+  version: ==0.0.34
+  channel: https://repo.prefix.dev/ecoscope-workflows-custom/
+- name: ecoscope-workflows-ext-mnc
+  version: ==1.0.5
+  channel: https://repo.prefix.dev/ecoscope-workflows-custom/
+task-instance-defaults:
+  skipif:
+    conditions:
+    - any_is_empty_df
+    - any_dependency_skipped
+workflow:
+- name: Connect to Earthranger
+  id: er_connection
+  task: set_er_connection
+- name: Set Base Maps
+  id: base_maps
+  task: set_base_maps
+  partial:
+    base_maps:
+    - url: https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}
+      opacity: 1
+      max_zoom: 20
+      min_zoom: 0
+    - url: https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}
+      opacity: 0.5
+      max_zoom: 20
+      min_zoom: 0
+- name: Set Workflow Details
+  id: workflow_details
+  task: set_workflow_details
+- name: Set Time Range
+  id: time_range
+  task: set_time_range
+  partial:
+    time_format: '%d %b %Y %H:%M:%S'
+- name: Set Groupers
+  id: groupers
+  task: set_groupers
+  partial:
+    groupers:
+    - index_name: subject_name
+- name: Subject Group
+  id: subjectgroup_observations
+  task: get_subjectgroup_observations
+  partial:
+    client: ${{ workflow.er_connection.return }}
+    time_range: ${{ workflow.time_range.return }}
+    include_details: true
+    raise_on_empty: true
+    include_subjectsource_details: false
+    filter: clean
+    include_subject_additional: false
+- name: Process Relocs
+  id: relocs
+  task: process_relocations
+  partial:
+    observations: ${{ workflow.subjectgroup_observations.return }}
+    relocs_columns:
+    - groupby_col
+    - fixtime
+    - junk_status
+    - geometry
+    - extra__subject__name
+    - extra__subject__hex
+    - extra__subject__sex
+    - extra__created_at
+    - extra__subject__subject_subtype
+    filter_point_coords:
+    - x: 180
+      y: 90
+    - x: 0
+      y: 0
+    - x: 1
+      y: 1
+- name: Trajectory Segment Filter
+  id: relocs_to_traj
+  task: relocations_to_trajectory
+  partial:
+    relocations: ${{ workflow.relocs.return }}
+    trajectory_segment_filter:
+      min_length_meters: 0.001
+      max_length_meters: 100000
+      min_time_secs: 1
+      max_time_secs: 172800
+      min_speed_kmhr: 0.01
+      max_speed_kmhr: 500
+- name: Add Temporal Index
+  id: temporal_index
+  task: add_temporal_index
+  partial:
+    df: ${{ workflow.relocs_to_traj.return }}
+    groupers: ${{ workflow.groupers.return }}
+    time_col: segment_start
+    cast_to_datetime: true
+    format: mixed
+- name: Map Columns
+  id: columns
+  task: map_columns
+  partial:
+    df: ${{ workflow.temporal_index.return }}
+    rename_columns:
+      extra__name: subject_name
+    drop_columns: []
+    retain_columns: []
+    raise_if_not_found: true
+    duplicate_strategy: suffix
+- name: Split Groups
+  id: groups
+  task: split_groups
+  partial:
+    groupers: ${{ workflow.groupers.return }}
+    df: ${{ workflow.columns.return }}
+- name: Build Ecograph
+  id: ecograph_gdf
+  task: generate_ecograph_gdf
+  partial:
+    movement_covariate: speed
+    network_metric: null
+    dist_col: dist_meters
+    resolution: null
+    radius: 2
+    tortuosity_length: 3
+    interpolation: mean
+  mapvalues:
+    argnames:
+    - gdf
+    argvalues: ${{ workflow.groups.return }}
+- name: Apply Classification
+  id: classification
+  task: apply_classification
+  partial:
+    input_column_name: value
+    output_column_name: value_bins
+    label_options:
+      label_prefix: ''
+      label_suffix: ''
+      label_ranges: true
+      label_decimals: 1
+    classification_options:
+      scheme: equal_interval
+      k: 5
+  mapvalues:
+    argnames:
+    - df
+    argvalues: ${{ workflow.ecograph_gdf.return }}
+- name: Apply Color Map
+  id: color_map
+  task: apply_color_map
+  partial:
+    input_column_name: value_bins
+    colormap: RdYlGn_r
+    output_column_name: value_colors
+  mapvalues:
+    argnames:
+    - df
+    argvalues: ${{ workflow.classification.return }}
+- name: Create Geojson Layer
+  id: geojson_layer
+  task: create_geojson_layer
+  partial:
+    legend:
+      title: Legend
+      label_column: value_bins
+      color_column: value_colors
+      sort: ascending
+      label_suffix: null
+    layer_style:
+      auto_highlight: false
+      opacity: 0.55
+      pickable: true
+      filled: true
+      stroked: true
+      extruded: false
+      wireframe: false
+      get_fill_color: value_colors
+      get_line_color: '[0, 0, 0]'
+      get_line_width: 0.35
+      get_elevation: null
+      get_point_radius: 1
+      line_width_units: pixels
+      line_width_scale: 1
+      line_width_min_pixels: 0
+      line_width_max_pixels: null
+      line_miter_limit: 4
+      line_joint_rounded: false
+      elevation_scale: 1
+      point_radius_units: pixels
+      point_radius_scale: 1
+      point_radius_min_pixels: 0
+      point_radius_max_pixels: null
+      billboard: false
+    tooltip_columns:
+    - value_bins
+    data_url: null
+  mapvalues:
+    argnames:
+    - geodataframe
+    argvalues: ${{ workflow.color_map.return }}
+- name: Compute View State From Gdf
+  id: view_state_from_gdf
+  task: compute_view_state_from_gdf
+  partial:
+    pitch: 0
+    bearing: 0
+    max_zoom: 18.0
+  mapvalues:
+    argnames:
+    - gdf
+    argvalues: ${{ workflow.color_map.return }}
+- name: Persist Ecograph
+  id: persist_ecograph
+  task: persist_df
+  partial:
+    root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+    filetype: geoparquet
+    filename: null
+  mapvalues:
+    argnames:
+    - df
+    argvalues: ${{ workflow.ecograph_gdf.return }}
+- name: Create Files Single View
+  id: files_single_view
+  task: create_files_single_view
+  mapvalues:
+    argnames:
+    - files
+    argvalues: ${{ workflow.persist_ecograph.return }}
+- name: Persist Relocations
+  id: persist_relocs
+  task: persist_df
+  partial:
+    root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+    df: ${{ workflow.relocs.return }}
+    filetype: geoparquet
+    filename: null
+- name: Persist Trajectories
+  id: persist_trajectories
+  task: persist_df
+  partial:
+    root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+    df: ${{ workflow.columns.return }}
+    filetype: geoparquet
+    filename: null
+- name: Pair up geo_layers, view_state by group
+  id: draw_ecograph_map_by_group
+  task: groupbykey
+  partial:
+    iterables:
+    - ${{ workflow.geojson_layer.return }}
+    - ${{ workflow.view_state_from_gdf.return }}
+- name: Draw Ecograph Map
+  id: draw_ecograph_map
+  task: draw_map
+  partial:
+    tile_layers: ${{ workflow.base_maps.return }}
+    static: false
+    output_type: html
+    title: ''
+    legend_style:
+      placement: bottom-right
+      format_title: false
+    max_zoom: 20
+  mapvalues:
+    argnames:
+    - geo_layers
+    - view_state
+    argvalues: ${{ workflow.draw_ecograph_map_by_group.return }}
+- name: Persist Ecograph Map
+  id: persist_ecograph_map
+  task: persist_text
+  partial:
+    root_path: ${{ env.ECOSCOPE_WORKFLOWS_RESULTS }}
+  mapvalues:
+    argnames:
+    - text
+    argvalues: ${{ workflow.draw_ecograph_map.return }}
+- name: Create Ecograph Widget Single View
+  id: ecograph_widget
+  task: create_map_widget_single_view
+  skipif:
+    conditions:
+    - never
+  partial:
+    title: Map
+  map:
+    argnames:
+    - view
+    - data
+    argvalues: ${{ workflow.persist_ecograph_map.return }}
+- name: Merge Widget Views
+  id: merged_widget_views
+  task: merge_widget_views
+  partial:
+    widgets: ${{ workflow.ecograph_widget.return }}
+- name: Gather Dashboard
+  id: dashboard
+  task: gather_dashboard
+  partial:
+    time_range: ${{ workflow.time_range.return }}
+    details: ${{ workflow.workflow_details.return }}
+    groupers: ${{ workflow.groupers.return }}
+    widgets: ${{ workflow.merged_widget_views.return }}
+  mapvalues:
+    argnames:
+    - files
+    argvalues: ${{ workflow.files_single_view.return }}
+rjsf-overrides:
+  uiSchema:
+    ui:order:
+    - workflow_details
+    - time_range
+    - er_connection
+    - subjectgroup_observations
+    - ecograph_gdf
+  properties:
+    subjectgroup_observations.properties.subject_group_name.ecoscope:transform:
+    - transformer: EarthRangerEnumResolver
+      transformer_kws:
+        type: subject_group_name
+        depends_on: properties.er_connection.properties.data_source.properties.name

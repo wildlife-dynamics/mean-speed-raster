@@ -1,0 +1,14 @@
+designer-run:
+  name: mean-speed-raster
+  description: The values used with ▶ Run in the designer.
+  params:
+    er_connection:
+      data_source:
+        name: Amboseli Trust for Elephants
+    workflow_details:
+      name: samplle
+    time_range:
+      since: '2026-10-15T00:00:00'
+      until: '2026-11-14T23:59:59'
+    subjectgroup_observations:
+      subject_group_name: Elephants - ATE
