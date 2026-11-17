@@ -370,7 +370,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             output_column_name="value_bins",
             label_options={
                 "label_prefix": "",
-                "label_suffix": "",
+                "label_suffix": "km/h",
                 "label_ranges": True,
                 "label_decimals": 1,
             },
@@ -417,7 +417,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         )
         .partial(
             legend={
-                "title": "Legend",
+                "title": "Mean Speed Raster (Km/h)",
                 "label_column": "value_bins",
                 "color_column": "value_colors",
                 "sort": "ascending",

@@ -240,7 +240,7 @@ workflow:
     output_column_name: value_bins
     label_options:
       label_prefix: ''
-      label_suffix: ''
+      label_suffix: 'km/h'
       label_ranges: true
       label_decimals: 1
     classification_options:
@@ -268,7 +268,7 @@ workflow:
   task: create_geojson_layer
   partial:
     legend:
-      title: Legend
+      title: Mean Speed Raster (Km/h)
       label_column: value_bins
       color_column: value_colors
       sort: ascending
