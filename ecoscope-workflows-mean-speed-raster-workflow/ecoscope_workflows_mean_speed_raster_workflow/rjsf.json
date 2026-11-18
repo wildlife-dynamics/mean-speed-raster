@@ -18,7 +18,22 @@
       ],
       "type": "object",
       "description": "Add information that will help to differentiate this workflow from another.",
-      "title": "Set Workflow Details"
+      "title": "Workflow Details"
+    },
+    "er_connection": {
+      "additionalProperties": false,
+      "properties": {
+        "data_source": {
+          "$ref": "#/$defs/EarthRangerConnection",
+          "description": "Select one of your configured data sources.",
+          "title": ""
+        }
+      },
+      "required": [
+        "data_source"
+      ],
+      "type": "object",
+      "title": "Data Source"
     },
     "time_range": {
       "additionalProperties": false,
@@ -47,29 +62,14 @@
       ],
       "type": "object",
       "description": "Choose the period of time to analyze.",
-      "title": "Set Time Range"
-    },
-    "er_connection": {
-      "additionalProperties": false,
-      "properties": {
-        "data_source": {
-          "$ref": "#/$defs/EarthRangerConnection",
-          "description": "Select one of your configured data sources.",
-          "title": ""
-        }
-      },
-      "required": [
-        "data_source"
-      ],
-      "type": "object",
-      "title": "Connect to Earthranger"
+      "title": "Time Range"
     },
     "groupers": {
       "additionalProperties": false,
       "properties": {
         "groupers": {
           "default": null,
-          "description": "Add a Subject Name entry to split the dashboard into one view per subject. Leave it empty to show all subjects in a single view.",
+          "description": "Specify how the data should be grouped to create the views for your dashboard. This field is optional; if left blank, all the data will appear in a single view.",
           "items": {
             "anyOf": [
               {
@@ -95,13 +95,13 @@
             ],
             "title": "Group by"
           },
-          "title": "Group by",
+          "title": " ",
           "type": "array"
         }
       },
       "type": "object",
       "required": [],
-      "title": "Set Groupers"
+      "title": "Group Data"
     },
     "subjectgroup_observations": {
       "additionalProperties": false,
@@ -318,7 +318,7 @@
       },
       "type": "object",
       "required": [],
-      "title": "Set Base Maps"
+      "title": "Map Base Layers"
     },
     "relocs_to_traj": {
       "additionalProperties": false,
@@ -370,6 +370,19 @@
     }
   },
   "$defs": {
+    "EarthRangerConnection": {
+      "properties": {
+        "name": {
+          "title": "Data Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "EarthRangerConnection",
+      "type": "object"
+    },
     "TimezoneInfo": {
       "properties": {
         "label": {
@@ -396,19 +409,6 @@
         "utc"
       ],
       "title": "TimezoneInfo",
-      "type": "object"
-    },
-    "EarthRangerConnection": {
-      "properties": {
-        "name": {
-          "title": "Data Source",
-          "type": "string"
-        }
-      },
-      "required": [
-        "name"
-      ],
-      "title": "EarthRangerConnection",
       "type": "object"
     },
     "SpatialGrouper": {
@@ -549,8 +549,8 @@
     },
     "ui:order": [
       "workflow_details",
-      "time_range",
       "er_connection",
+      "time_range",
       "groupers",
       "subjectgroup_observations",
       "base_maps",

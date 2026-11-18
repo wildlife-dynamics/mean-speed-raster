@@ -77,23 +77,6 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
         .call()
     )
 
-    time_range = (
-        task(set_time_range)
-        .validate()
-        .set_task_instance_id("time_range")
-        .handle_errors()
-        .with_tracing()
-        .skipif(
-            conditions=[
-                any_is_empty_df,
-                any_dependency_skipped,
-            ],
-            unpack_depth=1,
-        )
-        .partial(time_format="%d %b %Y %H:%M:%S", **(params.get("time_range") or {}))
-        .call()
-    )
-
     er_connection = (
         task(set_er_connection)
         .validate()
@@ -108,6 +91,23 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             unpack_depth=1,
         )
         .partial(**(params.get("er_connection") or {}))
+        .call()
+    )
+
+    time_range = (
+        task(set_time_range)
+        .validate()
+        .set_task_instance_id("time_range")
+        .handle_errors()
+        .with_tracing()
+        .skipif(
+            conditions=[
+                any_is_empty_df,
+                any_dependency_skipped,
+            ],
+            unpack_depth=1,
+        )
+        .partial(time_format="%d %b %Y %H:%M:%S", **(params.get("time_range") or {}))
         .call()
     )
 
@@ -357,7 +357,7 @@ def main(params: dict[str, Any], validate_params_schema: bool = True):
             output_column_name="value_bins",
             label_options={
                 "label_prefix": "",
-                "label_suffix": "km/h",
+                "label_suffix": " km/h",
                 "label_ranges": True,
                 "label_decimals": 1,
             },
